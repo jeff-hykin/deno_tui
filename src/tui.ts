@@ -1,5 +1,5 @@
 // Copyright 2022 Im-Beast. All rights reserved. MIT license.
-
+import { ensure } from 'https://deno.land/x/ensure/mod.ts'; ensure({ denoVersion: "1.27.0", })
 import { Canvas } from "./canvas.ts";
 import { Component } from "./component.ts";
 import { emptyStyle, Style } from "./theme.ts";
