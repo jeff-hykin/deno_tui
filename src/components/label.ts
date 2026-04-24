@@ -96,7 +96,7 @@ export class Label extends Component {
 
     this.text = signalify(options.text);
     this.overwriteRectangle = signalify(options.overwriteRectangle ?? false);
-    this.multiCodePointSupport = signalify(options.multiCodePointSupport ?? false);
+    this.multiCodePointSupport = signalify(options.multiCodePointSupport ?? true);
     this.align = signalify(options.align ?? { vertical: "top", horizontal: "left" }, { deepObserve: true });
 
     this.#valueLines = new Computed(() => this.text.value.split("\n"));

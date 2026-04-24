@@ -42,7 +42,7 @@ export class TextObject extends DrawObject<"text"> {
     this.text = signalify(options.value);
     this.rectangle = signalify(options.rectangle as Rectangle);
     this.overwriteRectangle = signalify(options.overwriteRectangle ?? false);
-    this.multiCodePointSupport = signalify(options.multiCodePointSupport ?? false);
+    this.multiCodePointSupport = signalify(options.multiCodePointSupport ?? true);
     this.valueChars = this.multiCodePointSupport.value ? getMultiCodePointCharacters(this.text.value) : this.text.value;
 
     const { updateObjects } = this.canvas;
