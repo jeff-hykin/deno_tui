@@ -141,7 +141,11 @@ export class Label extends Component {
         zIndex: this.zIndex,
         multiCodePointSupport: this.multiCodePointSupport,
         value: new Computed(() => {
-          const value = this.#valueLines.value[offset];
+          // Guard against shrink-then-recompute: if the text now has fewer
+          // lines than drawn TextObjects, offset can exceed valueLines.length
+          // until #popUnusedDrawObjects runs. cropToWidth would crash on
+          // undefined.
+          const value = this.#valueLines.value[offset] ?? "";
           return cropToWidth(value, this.rectangle.value.width);
         }),
         rectangle: new Computed(() => {
@@ -151,7 +155,7 @@ export class Label extends Component {
           textRectangle.column = column;
           textRectangle.row = row + offset;
 
-          let value = valueLines[offset];
+          let value = valueLines[offset] ?? "";
           value = cropToWidth(value, width);
           const valueWidth = textWidth(value);
 

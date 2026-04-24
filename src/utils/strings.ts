@@ -112,6 +112,7 @@ export function textWidth(text: string, start = 0): number {
 
 /** Crops {text} to given {width} */
 export function cropToWidth(text: string, width: number): string {
+  if (!text) return "";
   let cropped = "";
   let croppedWidth = 0;
   let ansi = 0;
