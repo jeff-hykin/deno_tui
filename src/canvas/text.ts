@@ -1,7 +1,7 @@
 // Copyright 2023 Im-Beast. MIT license.
 import { DrawObject, DrawObjectOptions } from "./draw_object.ts";
 
-import { getMultiCodePointCharacters, textWidth } from "../utils/strings.ts";
+import { characterWidth, getMultiCodePointCharacters, textWidth } from "../utils/strings.ts";
 import { fitsInRectangle, rectangleEquals, rectangleIntersection } from "../utils/numbers.ts";
 import { Effect, Signal, SignalOfObject } from "../signals/mod.ts";
 import { Rectangle } from "../types.ts";
@@ -192,12 +192,10 @@ export class TextObject extends DrawObject<"text"> {
     const { row } = rectangle;
 
     let rowRange = Math.min(row, rows);
-    let columnRange = Math.min(rectangle.column + valueChars.length, columns);
 
     const viewRectangle = this.view.peek()?.rectangle?.peek();
     if (viewRectangle) {
       rowRange = Math.min(row, viewRectangle.row + viewRectangle.height);
-      columnRange = Math.min(columnRange, viewRectangle.column + viewRectangle.width);
     }
 
     if (row > rowRange) return;
@@ -206,13 +204,35 @@ export class TextObject extends DrawObject<"text"> {
     if (!rerenderColumns) return;
 
     const omitColumns = omitCells[row];
-    if (omitColumns?.size === valueChars.length) {
-      return;
-    }
 
     const rowBuffer = frameBuffer[row] ??= [];
-
     const rerenderQueueRow = rerenderQueue[row] ??= new Set();
+
+    // Build column→char mapping that accounts for wide characters
+    // Each wide char (emoji etc.) occupies 2 columns: the char itself + an empty continuation
+    const columnMap: (string | undefined)[] = [];
+    let col = 0;
+    for (let i = 0; i < valueChars.length; i++) {
+      const ch = valueChars[i];
+      if (ch === undefined) break;
+      const w = characterWidth(ch);
+      columnMap[col] = ch;
+      col += 1;
+      if (w === 2) {
+        columnMap[col] = ""; // continuation column (empty, cursor skips it)
+        col += 1;
+      }
+    }
+
+    const totalCols = col;
+    let columnRange = Math.min(rectangle.column + totalCols, columns);
+    if (viewRectangle) {
+      columnRange = Math.min(columnRange, viewRectangle.column + viewRectangle.width);
+    }
+
+    if (omitColumns?.size === totalCols) {
+      return;
+    }
 
     for (const column of rerenderColumns) {
       if (
@@ -223,7 +243,14 @@ export class TextObject extends DrawObject<"text"> {
         continue;
       }
 
-      rowBuffer[column] = style(valueChars[column - rectangle.column]);
+      const charIdx = column - rectangle.column;
+      const ch = columnMap[charIdx];
+      if (ch === "") {
+        // Continuation column for a wide char — empty string, terminal handles it
+        rowBuffer[column] = "";
+      } else {
+        rowBuffer[column] = style(ch ?? " ");
+      }
       rerenderQueueRow.add(column);
     }
 

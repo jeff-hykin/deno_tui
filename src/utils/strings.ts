@@ -92,7 +92,14 @@ export function textWidth(text: string, start = 0): number {
         break loop;
       default:
         if (!ansi) {
-          width += characterWidth(char);
+          // Use codePointAt to get the full codepoint (handles surrogate pairs)
+          const cp = text.codePointAt(i) ?? 0;
+          if (cp > 0xFFFF) {
+            width += 2;
+            i += 1; // skip the low surrogate
+          } else {
+            width += characterWidth(char);
+          }
         } else if (isFinalAnsiByte(char)) {
           ansi = false;
         }
@@ -120,7 +127,9 @@ export function cropToWidth(text: string, width: number): string {
     } else if (ansi > 0) {
       ansi += 1;
     } else {
-      const charWidth = characterWidth(char);
+      // Handle surrogate pairs for emoji
+      const cp = text.codePointAt(i) ?? 0;
+      const charWidth = cp > 0xFFFF ? 2 : characterWidth(char);
 
       if (croppedWidth + charWidth > width) {
         if (croppedWidth + 1 === width) {
@@ -129,6 +138,13 @@ export function cropToWidth(text: string, width: number): string {
         break;
       } else {
         croppedWidth += charWidth;
+      }
+
+      if (cp > 0xFFFF) {
+        // Include both surrogates for the emoji character
+        cropped += char + text[i + 1];
+        i += 1; // skip low surrogate
+        continue;
       }
     }
 
@@ -148,12 +164,19 @@ export function isFinalAnsiByte(character: string): boolean {
  * Return width of given character
  *
  * Originally created by sindresorhus: https://github.com/sindresorhus/is-fullwidth-code-point/blob/main/index.js
+ * Updated to use codePointAt for proper emoji/surrogate pair support
  */
 export function characterWidth(character: string): number {
-  const codePoint = character.charCodeAt(0);
+  const codePoint = character.codePointAt(0) ?? 0;
 
-  if (codePoint === 0xD83E || codePoint === 0x200B) {
+  // Zero-width characters
+  if (codePoint === 0x200B || codePoint === 0xFE0F || codePoint === 0xFE0E || codePoint === 0x200D) {
     return 0;
+  }
+
+  // Emoji and supplementary plane characters (above BMP) are generally double-width
+  if (codePoint > 0xFFFF) {
+    return 2;
   }
 
   if (
@@ -170,10 +193,7 @@ export function characterWidth(character: string): number {
       (0xfe10 <= codePoint && codePoint <= 0xfe19) ||
       (0xfe30 <= codePoint && codePoint <= 0xfe6b) ||
       (0xff01 <= codePoint && codePoint <= 0xff60) ||
-      (0xffe0 <= codePoint && codePoint <= 0xffe6) ||
-      (0x1b000 <= codePoint && codePoint <= 0x1b001) ||
-      (0x1f200 <= codePoint && codePoint <= 0x1f251) ||
-      (0x20000 <= codePoint && codePoint <= 0x3fffd))
+      (0xffe0 <= codePoint && codePoint <= 0xffe6))
   ) {
     return 2;
   }
