@@ -248,6 +248,9 @@ export class TextObject extends DrawObject<"text"> {
       if (ch === "") {
         // Continuation column for a wide char — empty string, terminal handles it
         rowBuffer[column] = "";
+      } else if (ch && ch.includes("\x1b")) {
+        // Character has inline ANSI styling — use it as-is
+        rowBuffer[column] = ch;
       } else {
         rowBuffer[column] = style(ch ?? " ");
       }
