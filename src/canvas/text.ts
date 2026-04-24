@@ -208,6 +208,11 @@ export class TextObject extends DrawObject<"text"> {
     const rowBuffer = frameBuffer[row] ??= [];
     const rerenderQueueRow = rerenderQueue[row] ??= new Set();
 
+    // Cache the component's style prefix (bg + fg codes without content or reset)
+    // Used to ensure consistent background for inline-styled characters
+    const styledSentinel = style("\x00");
+    const baseStylePrefix = styledSentinel.slice(0, styledSentinel.indexOf("\x00"));
+
     // Build column→char mapping that accounts for wide characters
     // Each wide char (emoji etc.) occupies 2 columns: the char itself + an empty continuation
     const columnMap: (string | undefined)[] = [];
@@ -249,8 +254,9 @@ export class TextObject extends DrawObject<"text"> {
         // Continuation column for a wide char — empty string, terminal handles it
         rowBuffer[column] = "";
       } else if (ch && ch.includes("\x1b")) {
-        // Character has inline ANSI styling — use it as-is
-        rowBuffer[column] = ch;
+        // Prepend component's base style (background) before inline ANSI.
+        // The inline style overrides fg/bold/etc but inherits the background.
+        rowBuffer[column] = baseStylePrefix + ch;
       } else {
         rowBuffer[column] = style(ch ?? " ");
       }
