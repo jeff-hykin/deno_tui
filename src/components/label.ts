@@ -146,7 +146,17 @@ export class Label extends Component {
           // until #popUnusedDrawObjects runs. cropToWidth would crash on
           // undefined.
           const value = this.#valueLines.value[offset] ?? "";
-          return cropToWidth(value, this.rectangle.value.width);
+          const cropped = cropToWidth(value, this.rectangle.value.width);
+          // When overwriteRectangle is true, pad each line out to the full
+          // rect width with spaces. The TextObject applies the Label's base
+          // style to every painted cell, so this makes the Label's bg fill
+          // the entire rectangle instead of leaving the right side either
+          // un-painted (showing stale pixels) or covered by a lower-z bg
+          // that may not match.
+          if (!this.overwriteRectangle.value) return cropped;
+          const visW = textWidth(cropped);
+          const padW = this.rectangle.value.width - visW;
+          return padW > 0 ? cropped + " ".repeat(padW) : cropped;
         }),
         rectangle: new Computed(() => {
           const valueLines = this.#valueLines.value;
