@@ -100,6 +100,10 @@ export class TextBox extends Box {
   lineHighlighting: Signal<boolean>;
   cursorPosition: Signal<CursorPosition>;
   multiCodePointSupport: Signal<boolean>;
+  // Topmost visible line index. Decoupled from cursor position so cursor
+  // moves freely inside the visible window before the viewport scrolls,
+  // matching the conventional "edge-anchored scroll" feel of vim/nano.
+  viewTop: Signal<number>;
 
   constructor(options: TextBoxOptions) {
     super(options);
@@ -109,6 +113,7 @@ export class TextBox extends Box {
     this.theme.highlightedLine ??= this.theme;
 
     this.cursorPosition = new Signal({ x: 0, y: 0 }, { deepObserve: true });
+    this.viewTop = new Signal(0);
 
     this.text = signalify(options.text ?? "");
     this.lineNumbering = signalify(options.lineNumbering ?? false);
@@ -117,6 +122,21 @@ export class TextBox extends Box {
 
     // FIXME: This creates unnecessary arrays each time it runs
     this.#textLines = new Computed(() => this.text.value.split("\n"));
+
+    // Maintain `cursor in [viewTop, viewTop+height-1]`. Only nudges viewTop
+    // when the cursor would otherwise leave the window.
+    new Effect(() => {
+      const cy = this.cursorPosition.value.y;
+      const height = this.rectangle.value.height;
+      const totalLines = this.#textLines.value.length;
+      let top = this.viewTop.peek();
+      if (cy < top) top = cy;
+      else if (cy > top + height - 1) top = cy - height + 1;
+      const maxTop = Math.max(0, totalLines - height);
+      if (top > maxTop) top = maxTop;
+      if (top < 0) top = 0;
+      if (top !== this.viewTop.peek()) this.viewTop.value = top;
+    });
 
     new Effect(() => {
       this.#updateLineDrawObjects();
@@ -228,9 +248,10 @@ export class TextBox extends Box {
       style: new Computed(() => this.theme.cursor[this.state.value]),
       rectangle: new Computed(() => {
         const cursorPosition = this.cursorPosition.value;
+        const viewTop = this.viewTop.value;
         const { row, column, width, height } = this.rectangle.value;
 
-        cursorRectangle.row = row + Math.min(cursorPosition.y, height - 1);
+        cursorRectangle.row = row + clamp(cursorPosition.y - viewTop, 0, height - 1);
 
         if (this.lineNumbering.value) {
           const lineNumbersWidth = this.drawnObjects.lineNumbers[0].rectangle.peek().width;
@@ -312,7 +333,7 @@ export class TextBox extends Box {
             const highlightLine = this.lineHighlighting.value;
             const cursorPosition = this.cursorPosition.value;
 
-            const offsetY = Math.max(cursorPosition.y - this.rectangle.value.height + 1, 0);
+            const offsetY = this.viewTop.value;
             const currentLine = offsetY + offset;
 
             if (highlightLine && cursorPosition.y === currentLine) {
@@ -329,7 +350,7 @@ export class TextBox extends Box {
             }
 
             const offsetX = cursorPosition.x - width + 1;
-            const offsetY = Math.max(cursorPosition.y - height + 1, 0);
+            const offsetY = this.viewTop.value;
 
             const value = this.#textLines.value[offset + offsetY]?.replace("\t", " ") ?? "";
 
