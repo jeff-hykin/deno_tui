@@ -149,11 +149,15 @@ export class Component extends EventEmitter<
       const value = drawnObjects[key];
 
       if (Array.isArray(value)) {
+        // `delete arr[i]` (used by TextBox#updateLineDrawObjects when the
+        // rect shrinks) leaves sparse holes; for…of yields `undefined` for
+        // them. Guard so destroy doesn't crash on a previously-resized box.
         for (const object of value) {
+          if (!object) continue;
           if (visible) object.draw();
           else object.erase();
         }
-      } else {
+      } else if (value) {
         if (visible) value.draw();
         else value.erase();
       }
