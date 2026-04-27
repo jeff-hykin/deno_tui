@@ -20,9 +20,6 @@ export function getMultiCodePointCharacters(text: string): string[] {
     let ansi = 0;
     let lastStyle = "";
     for (const char of matched) {
-      arr[i] ??= "";
-      arr[i] += lastStyle + char;
-
       if (char === "\x1b") {
         ++ansi;
         lastStyle += "\x1b";
@@ -39,7 +36,12 @@ export function getMultiCodePointCharacters(text: string): string[] {
           ++ansi;
         }
       } else {
-        ++i;
+        // Visible char only: store accumulated style + char for this cell.
+        // Previously ANSI bytes were also appended to arr[i], which piled
+        // reset sequences from the previous visible char into the NEXT
+        // visible cell — terminals then rendered that cell with the
+        // default background instead of the component's base.
+        arr[i++] = lastStyle + char;
       }
     }
 
